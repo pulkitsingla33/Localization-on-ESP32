@@ -1,0 +1,11 @@
+{
+  "rf_min": -110.0,
+  "rf_max": -30.0,
+  "input_dim": 35,
+  "n_classes": 11,
+  "hidden_units": [
+    64,
+    32
+  ],
+  "dropout_rate": 0.2
+}

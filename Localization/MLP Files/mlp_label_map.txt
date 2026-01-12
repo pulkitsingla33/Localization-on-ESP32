@@ -1,0 +1,11 @@
+0,bijuOffice
+1,csHod
+2,d151d153
+3,d171
+4,dlt7
+5,dlt8
+6,iotLab2
+7,itRoom
+8,meetingRoom
+9,roboticsLab
+10,systemsLab2

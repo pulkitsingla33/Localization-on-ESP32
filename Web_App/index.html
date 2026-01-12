@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ESP32 Live Dashboard</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<style>
+body {
+  font-family: Arial;
+  padding: 20px;
+  background: #f5f5f5;
+}
+
+.box {
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+}
+
+#map-container {
+  position: relative;
+  width: 1500px;
+  height: 700px;
+  border: 2px solid #444;
+  margin-top: 10px;
+}
+
+#floor-map {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+#marker {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: rgb(255, 251, 0);
+  border-radius: 50%;
+  border: 2px solid white;
+  transform: translate(-50%, -50%);
+}
+
+#log-box {
+  height: 200px;
+  overflow-y: auto;
+  background: #111;
+  color: #0f0;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>ESP32 Live Dashboard</h1>
+
+<div class="box">
+  <h2>MQTT Status:</h2>
+  <p id="status">Connecting...</p>
+</div>
+
+<div class="box">
+  <h2>Location:</h2>
+  <p id="loc">Waiting...</p>
+</div>
+
+<div class="box">
+  <h2>Activity:</h2>
+  <p id="act">Waiting...</p>
+</div>
+
+<div class="box">
+  <h2>Live Floor Map</h2>
+  <div id="map-container">
+    <img id="floor-map" src="floor.png">
+    <div id="marker"></div>
+  </div>
+</div>
+
+<div class="box">
+  <h2>Data Log</h2>
+  <div id="log-box"></div>
+</div>
+
+<button onclick="downloadLogAsCSV()">Download Log as CSV</button>
+
+<script>
+
+/* ---------------- MQTT CONFIG ---------------- */
+const host = "a2b6b9feb01b4f678b5891f1f5720153.s1.eu.hivemq.cloud";
+const port = 8884;
+const username = "pulkit_IoT";
+const password = "pulkit_IoT123";
+
+const url = `wss://${host}:${port}/mqtt`;
+
+document.getElementById("status").innerText = "Connecting to MQTT...";
+
+/* ---------------- MQTT CLIENT ---------------- */
+const client = mqtt.connect(url, {
+    username: username,
+    password: password,
+    reconnectPeriod: 2000,
+});
+
+/* ---------------- Location → Map Coordinates ---------------- */
+const mapPositions = {
+    "d171": { x: 292, y: 249 },
+    "bijuOffice": { x: 857, y: 244 },
+    "systemsLab2": { x: 842, y: 54 },
+    "roboticsLab": { x: 1089, y: 265 },
+    "iotLab2": { x: 1050, y: 553 },
+    "csHod": {x: 1361, y: 312},
+    "itRoom": {x: 1361, y: 616},
+    "dlt7": {x: 354, y: 616},
+    "dlt8": {x: 648, y: 616},
+    "d151d153": {x: 363, y: 410},
+    "meetingRoom": {x: 648, y: 295}
+};
+
+function updateMarker(loc) {
+  if (!mapPositions[loc]) return;
+
+  const marker = document.getElementById("marker");
+  marker.style.left = mapPositions[loc].x + "px";
+  marker.style.top = mapPositions[loc].y + "px";
+}
+
+/* ---------------- Append to Log ---------------- */
+function logMessage(text) {
+  const box = document.getElementById("log-box");
+  const time = new Date().toLocaleTimeString();
+
+  box.innerHTML += `[${time}] ${text}<br>`;
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ---------------- MQTT EVENT HANDLERS ---------------- */
+
+client.on("connect", () => {
+    document.getElementById("status").innerText = "Connected ✔️";
+    client.subscribe("esp32/localization");
+    logMessage("Connected to MQTT");
+});
+
+client.on("error", (err) => {
+    document.getElementById("status").innerText = "Error: " + err.message;
+    logMessage("Error: " + err.message);
+});
+
+client.on("message", (topic, msg) => {
+    msg = msg.toString();
+    logMessage(`RX ${topic}: ${msg}`);
+
+    if (topic === "esp32/localization") {
+        try {
+            const data = JSON.parse(msg);
+
+            if (data.location) {
+                document.getElementById("loc").innerText = data.location;
+                updateMarker(data.location);
+            }
+            if (data.activity) {
+                document.getElementById("act").innerText = data.activity;
+            }
+        } catch (e) {
+            logMessage("Invalid JSON received!");
+        }
+    }
+});
+
+//Add Feature to download data logs as CSV
+function downloadLogAsCSV() {
+    const box = document.getElementById("log-box");
+    const logText = box.innerText;
+    const csvContent = "data:text/csv;charset=utf-8," + logText.replace(/\n/g, "\r\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "data_log.csv");
+    document.body.appendChild(link); // Required for FF
+
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+
+</body>
+</html>
